@@ -43,11 +43,6 @@ async function fetchDelegate(url) {
     throw err;
   }
 }
-async function myAsyncFunction() {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve("Hello from async function in isolate!"), 10);
-  });
-}
 
 app.get("/", async (req, res) => {
   let isolate, context, script;
@@ -66,18 +61,51 @@ app.get("/", async (req, res) => {
     // Expose the fetchDelegate function to the isolate.
     const delegateRef = new ivm.Reference(fetchDelegate);
     jail.setSync("fetchDelegate", delegateRef);
-    jail.setSync("myAsyncFunction", new ivm.Reference(myAsyncFunction));
 
     // Compile a script that calls fetchDelegate and returns its result.
     // We call fetchDelegate.apply with options to await its promise and deep-copy its result.
     const fn = await context.eval(
       `
+        // Define a fetch function that uses fetchDelegate internally
+        async function fetch(url, options = {}) {
+          const response = await fetchDelegate.apply(undefined, [url], { result: { promise: true, copy: true } });
+          return {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            json: async () => response.data,
+            text: async () => JSON.stringify(response.data),
+            blob: async () => new Blob([JSON.stringify(response.data)]),
+            arrayBuffer: async () => new ArrayBuffer(0),
+            clone: () => fetch(url, options)
+          };
+        }
+
+        async function fetchPageContent(url, pluginServer) {
+        try{
+          const response = await fetch(
+            \`\${pluginServer}/web-page-reader/get-content?url=\${encodeURIComponent(url)}\`
+          );
+            
+          if (!response.ok) {
+            throw new Error(
+              \`Failed to fetch web content: \${response.status} - \${response.statusText}\`
+            );
+          }
+            
+          const data = await response.json();
+          return data.responseObject;
+        } catch (error) {
+          console.error('Error fetching web content:', error);
+          return 'Error: Unable to generate a summary. Please try again later.';
+        }
+        }
+
+        
         (async function untrusted() { 
-            let str = await fetchDelegate.apply(undefined, [
-          "https://jsonplaceholder.typicode.com/todos/1"
-        ], { result: { promise: true, copy: true} });
-            log("str => ", str.data);
-            return str.data;
+          const result = await fetchPageContent("https://tamagui.dev/docs/intro/benchmarks", "https://plugins-server-1o4l.onrender.com");
+          return result;
         })
     `,
       { reference: true }
