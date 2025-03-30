@@ -88,7 +88,7 @@ app.get("/", async (req, res) => {
 
     console.log('plainResult => ', plainResult);
 
-    res.json({ message: "Script executed successfully", plainResult });
+    res.json({ message: "Script executed successfully in vercel", plainResult });
   } catch (err) {
     console.error("Error during isolate execution:", err);
     res.status(500).json({ error: err.message });
