@@ -1,26 +1,17 @@
 const ivm = require("isolated-vm");
 
 // Host-side delegate function that makes an HTTPS call.
-async function fetchDelegate(url) {
+async function fetchDelegate(url, config) {
   try {
-    console.log("Delegate: Starting fetch for URL:", url);
-    const response = await fetch(url);
-    console.log("Delegate: Response status:", response.status);
-
-    const headers = {};
-    response.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
+    const response = await fetch(url, config);
 
     const data = await response.json();
-    console.log("Delegate: Response data:", data);
 
     // Return a plain object that can be deep-copied.
     return {
       ok: response.ok,
       status: response.status,
       statusText: response.statusText,
-      headers,
       data, // full data object
     };
   } catch (err) {
@@ -58,7 +49,6 @@ async function runUnstructuredCode({ id, untrustedCode }) {
               ok: response.ok,
               status: response.status,
               statusText: response.statusText,
-              headers: response.headers,
               json: async () => response.data,
               text: async () => JSON.stringify(response.data),
               blob: async () => new Blob([JSON.stringify(response.data)]),
@@ -71,7 +61,7 @@ async function runUnstructuredCode({ id, untrustedCode }) {
       `,
       { reference: true }
     );
-    const value = await fn.apply(undefined, [], { result: { promise: true } });
+    const value = await fn.apply(undefined, [], { result: { promise: false, copy: true } });
     const plainResult = value?.copySync?.();
     return plainResult;
   } catch (err) {
@@ -86,12 +76,16 @@ async function runUnstructuredCode({ id, untrustedCode }) {
 async function runServerPlugin({ id, name, code, params, userSettings }) {
   const idWithFallback = id || name;
   const wrappedCode = `
-          ${code}
-          (async function untrusted() { 
-            const result = await ${name}(${JSON.stringify(params)}, ${JSON.stringify(userSettings)})
-            return result;
-          })
-    `;
+    ${code}
+    (async function untrusted() { 
+      try {
+        const result = await ${name}(${JSON.stringify(params)}, ${JSON.stringify(userSettings)});
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    })()
+  `;
 
   return await runUnstructuredCode({
     id: idWithFallback,
@@ -102,3 +96,4 @@ async function runServerPlugin({ id, name, code, params, userSettings }) {
 module.exports = {
   runServerPlugin,
 };
+
