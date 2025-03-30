@@ -38,14 +38,13 @@ async function runUnstructuredCode({ id, untrustedCode }) {
     const delegateRef = new ivm.Reference(fetchDelegate);
     jail.setSync("fetchDelegate", delegateRef);
 
-    // Compile a script that calls fetchDelegate and returns its result.
-    // We call fetchDelegate.apply with options to await its promise and deep-copy its result.
+    // Evaluate the untrusted code and get its result
     const fn = await context.eval(
       `
           // Define a fetch function that uses fetchDelegate internally
           async function fetch(url, options = {}) {
             const response = await fetchDelegate.apply(undefined, [url], { result: { promise: true, copy: true } });
-            return {
+            return { 
               ok: response.ok,
               status: response.status,
               statusText: response.statusText,
@@ -57,12 +56,19 @@ async function runUnstructuredCode({ id, untrustedCode }) {
             };
           }
    
-        ${untrustedCode}
+          ${untrustedCode}
       `,
-      { reference: true }
+      {
+        reference: true,
+        result: { promise: true, copy: true },
+      }
     );
-    const value = await fn.apply(undefined, [], { result: { promise: false, copy: true } });
-    const plainResult = value?.copySync?.();
+
+    const result = await fn.apply(undefined, [], {
+      result: { promise: true, copy: true },
+    });
+    console.log("🚀 ~ runUnstructuredCode ~ result:", result)
+    const plainResult = result?.copySync?.() || result;
     return plainResult;
   } catch (err) {
     console.error("Error during isolate execution:", err);
@@ -79,12 +85,15 @@ async function runServerPlugin({ id, name, code, params, userSettings }) {
     ${code}
     (async function untrusted() { 
       try {
-        const result = await ${name}(${JSON.stringify(params)}, ${JSON.stringify(userSettings)});
+        console.log("🚀 ~ untrusted ~ params:", ${JSON.stringify(params)}, ${JSON.stringify(userSettings)})
+        const result = await ${name}(${JSON.stringify(
+    params
+  )}, ${JSON.stringify(userSettings)});
         return result;
       } catch (error) {
         throw error;
       }
-    })()
+    })
   `;
 
   return await runUnstructuredCode({
@@ -96,4 +105,3 @@ async function runServerPlugin({ id, name, code, params, userSettings }) {
 module.exports = {
   runServerPlugin,
 };
-
