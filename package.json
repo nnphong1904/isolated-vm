@@ -1,0 +1,22 @@
+{
+  "name": "isolated-vm",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --no-node-snapshot api/index.js",
+    "start": "node --no-node-snapshot api/index.js",
+    "production": "NODE_ENV=production node --no-node-snapshot api/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^4.21.2",
+    "isolated-vm": "^5.0.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
