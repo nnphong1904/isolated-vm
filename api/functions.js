@@ -67,9 +67,7 @@ async function runUnstructuredCode({ id, untrustedCode }) {
     const result = await fn.apply(undefined, [], {
       result: { promise: true, copy: true },
     });
-    console.log("🚀 ~ runUnstructuredCode ~ result:", result)
-    const plainResult = result?.copySync?.() || result;
-    return plainResult;
+    return result;
   } catch (err) {
     console.error("Error during isolate execution:", err);
     throw err;
@@ -85,7 +83,6 @@ async function runServerPlugin({ id, name, code, params, userSettings }) {
     ${code}
     (async function untrusted() { 
       try {
-        console.log("🚀 ~ untrusted ~ params:", ${JSON.stringify(params)}, ${JSON.stringify(userSettings)})
         const result = await ${name}(${JSON.stringify(
     params
   )}, ${JSON.stringify(userSettings)});
